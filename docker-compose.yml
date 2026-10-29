@@ -1,0 +1,12 @@
+# Servidor LiveKit local para desenvolvimento.
+# Sobe com:  docker compose up -d
+# Chaves de desenvolvimento: devkey / secret
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --dev --bind 0.0.0.0
+    ports:
+      - "7880:7880"          # sinalização (WebSocket)
+      - "7881:7881"          # WebRTC via TCP
+      - "7882:7882/udp"      # WebRTC via UDP
+    restart: unless-stopped

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reunião</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232f6df6'/%3E%3Cpath d='M5 8.5A1.5 1.5 0 0 1 6.5 7h7A1.5 1.5 0 0 1 15 8.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 5 15.5v-7Zm10 2.5 4-2.5v7L15 13' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+<!-- SDK do LiveKit para navegador (expõe o global LivekitClient) -->
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ============================== LOBBY ============================== -->
+<main id="lobby" class="lobby">
+  <section class="lobby-card">
+    <header class="brand">
+      <span class="logo"><svg viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h8A2.5 2.5 0 0 1 16 8.5v7a2.5 2.5 0 0 1-2.5 2.5h-8A2.5 2.5 0 0 1 3 15.5v-7Zm13 2.2 4.2-2.6a.5.5 0 0 1 .8.4v7a.5.5 0 0 1-.8.4L16 13.3"/></svg></span>
+      <div><h1>Reunião</h1><p>Vídeo, áudio e compartilhamento de tela no navegador</p></div>
+    </header>
+
+    <div class="preview">
+      <video id="preview" autoplay muted playsinline></video>
+      <div id="previewOff" class="preview-off"><div class="avatar big" id="previewAvatar">?</div><span>Câmera desligada</span></div>
+      <div class="preview-ctrls">
+        <button id="pvMic" class="round on" title="Microfone"></button>
+        <button id="pvCam" class="round on" title="Câmera"></button>
+      </div>
+    </div>
+
+    <form id="joinForm" autocomplete="off">
+      <label>Seu nome<input id="name" maxlength="40" placeholder="Como os outros vão te ver" required></label>
+      <label>Sala
+        <div class="row"><input id="room" maxlength="63" placeholder="ex.: equipe-semanal" required>
+        <button type="button" id="newRoom" class="ghost" title="Gerar nova sala">Nova</button></div>
+      </label>
+      <label id="codeWrap" hidden>Código de acesso<input id="code" type="password" placeholder="Informado pelo organizador"></label>
+      <div class="row devs">
+        <label>Câmera<select id="pvVideoDev"></select></label>
+        <label>Microfone<select id="pvAudioDev"></select></label>
+      </div>
+      <p id="lobbyErr" class="err" hidden></p>
+      <button id="joinBtn" class="primary" type="submit">Entrar na reunião</button>
+    </form>
+  </section>
+</main>
+
+<!-- ============================== SALA ============================== -->
+<main id="meeting" class="meeting" hidden>
+  <header class="topbar">
+    <div class="room-info"><b id="roomTitle"></b><span id="timer">00:00</span><span id="netBadge" class="badge" hidden>Reconectando…</span></div>
+    <div class="top-actions">
+      <button id="copyLink" class="ghost sm">Copiar convite</button>
+      <button id="layoutBtn" class="ghost sm" title="Alternar layout">Layout</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <section id="stageWrap" class="stage-wrap">
+      <div id="stage" class="stage" hidden></div>
+      <div id="grid" class="grid"></div>
+    </section>
+
+    <aside id="side" class="side" hidden>
+      <div class="side-tabs">
+        <button data-tab="chat" class="on">Chat</button>
+        <button data-tab="people">Participantes <span id="peopleCount">1</span></button>
+        <button id="closeSide" class="x" title="Fechar">✕</button>
+      </div>
+      <div id="tab-chat" class="tab on">
+        <div id="messages" class="messages"><p class="muted center">As mensagens aparecem aqui. Quem entrar depois não vê o histórico.</p></div>
+        <form id="chatForm" class="chat-form"><input id="chatInput" maxlength="1000" placeholder="Escreva uma mensagem"><button class="primary sm">Enviar</button></form>
+      </div>
+      <div id="tab-people" class="tab"><ul id="people" class="people"></ul></div>
+    </aside>
+  </div>
+
+  <footer class="controls">
+    <button id="micBtn" class="ctrl" title="Microfone (Ctrl+D)"></button>
+    <button id="camBtn" class="ctrl" title="Câmera (Ctrl+E)"></button>
+    <button id="screenBtn" class="ctrl" title="Compartilhar tela"></button>
+    <button id="chatBtn" class="ctrl" title="Chat"><span id="unread" class="dot" hidden></span></button>
+    <button id="peopleBtn" class="ctrl" title="Participantes"></button>
+    <button id="settingsBtn" class="ctrl" title="Dispositivos"></button>
+    <button id="leaveBtn" class="ctrl leave" title="Sair">Sair</button>
+  </footer>
+
+  <button id="audioUnlock" class="audio-unlock" hidden>🔊 Clique para ativar o áudio da reunião</button>
+</main>
+
+<!-- dispositivos -->
+<dialog id="devDialog">
+  <form method="dialog">
+    <h3>Dispositivos</h3>
+    <label>Câmera<select id="videoDev"></select></label>
+    <label>Microfone<select id="audioDev"></select></label>
+    <label>Alto-falante<select id="outputDev"></select></label>
+    <menu><button class="primary sm">Fechar</button></menu>
+  </form>
+</dialog>
+
+<!-- saída -->
+<main id="left" class="lobby" hidden>
+  <section class="lobby-card center">
+    <h1>Você saiu da reunião</h1>
+    <p class="muted" id="leftReason"></p>
+    <div class="row" style="justify-content:center;gap:10px;margin-top:18px">
+      <button class="primary" onclick="location.reload()">Entrar novamente</button>
+      <button class="ghost" onclick="location.href='/'">Página inicial</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
