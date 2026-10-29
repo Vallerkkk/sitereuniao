@@ -18,7 +18,7 @@ const ok = (c, m) => { if (!c) throw new Error('FALHOU: ' + m); console.log('ok 
   const shot = (n) => p.screenshot({ path: path.join(OUT, n + '.png') });
 
   await p.goto(BASE + '/sala/equipe-semanal');
-  await p.waitForTimeout(1500);
+  await p.waitForFunction(() => !!document.querySelector('#preview').srcObject, null, { timeout: 15000 });
   ok(await p.inputValue('#room') === 'equipe-semanal', 'link de convite preenche a sala');
   ok(await p.evaluate(() => !!document.querySelector('#preview').srcObject), 'pré-visualização da câmera no lobby');
   await p.fill('#name', 'João Pedro');
@@ -48,6 +48,14 @@ const ok = (c, m) => { if (!c) throw new Error('FALHOU: ' + m); console.log('ok 
   await p.click('#screenBtn'); await p.waitForTimeout(700);
   ok(await p.locator('#stage .tile.screen').count() === 1, 'compartilhamento de tela em destaque');
   ok(await p.locator('#grid .tile').count() === 4, 'câmeras em faixa abaixo da apresentação');
+  await p.click('#stage .tile.screen .fs'); await p.waitForTimeout(500);
+  ok(await p.locator('#fullShare:not([hidden])').count() === 1, 'abre a apresentação em tela cheia');
+  ok(await p.locator('#fullStage .tile.screen').count() === 1, 'bloco da tela vai para a sobreposição');
+  ok(await p.evaluate(() => document.querySelector('#fullStage .tile').getBoundingClientRect().width === window.innerWidth), 'sobreposição ocupa a largura da tela');
+  await shot('3b-tela-cheia');
+  await p.click('#exitFull'); await p.waitForTimeout(500);
+  ok(await p.locator('#fullShare[hidden]').count() === 1, 'fecha a tela cheia');
+  ok(await p.locator('#stage .tile.screen').count() === 1, 'bloco volta para o destaque');
   await shot('3-tela');
   await p.click('#screenBtn'); await p.waitForTimeout(500);
   ok(await p.locator('#stage .tile').count() === 0, 'parar compartilhamento volta à grade');
@@ -55,6 +63,10 @@ const ok = (c, m) => { if (!c) throw new Error('FALHOU: ' + m); console.log('ok 
   await p.evaluate(() => { __mock.leave('id-ana'); __mock.addRemote('Bruno', { screen: true }); });
   await p.waitForTimeout(600);
   ok(await p.locator('#stage .tile.screen').count() === 1, 'tela de participante remoto em destaque');
+  await p.click('#stage .tile.screen .fs'); await p.waitForTimeout(400);
+  ok(await p.locator('#fullShare:not([hidden])').count() === 1, 'tela cheia da apresentação remota');
+  await p.evaluate(() => { __mock.leave('id-bruno'); __mock.addRemote('Bruno'); }); await p.waitForTimeout(600);
+  ok(await p.locator('#fullShare[hidden]').count() === 1, 'tela cheia fecha quando a apresentação termina');
 
   await p.evaluate(() => __mock.chat('id-vander', 'Bom dia, pessoal!'));
   await p.waitForTimeout(300);

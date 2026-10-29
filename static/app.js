@@ -17,6 +17,7 @@ const P = {
   people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.4 3.5 5.2"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
   pin: '<path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5ZM12 14v6"/>',
+  expand: '<path d="M9 4H4v5M15 20h5v-5M15 4h5v5M9 20H4v-5"/>',
 };
 const ic = (n) => `<svg viewBox="0 0 24 24">${P[n]}</svg>`;
 
@@ -137,6 +138,7 @@ let roomName = '';
 let startedAt = 0;
 let timerI = 0;
 let pinned = null;            // chave do bloco fixado
+let fullKey = null;           // bloco aberto em tela cheia
 let layoutMode = 'auto';      // 'auto' (tela em destaque) | 'grid'
 let leftByUser = false;
 const tiles = new Map();      // chave -> { el, video, track }
@@ -215,6 +217,7 @@ function mediaError(what, e) {
 
 function onDisconnected(reason) {
   clearInterval(timerI);
+  closeFull();
   tiles.forEach((t) => t.track?.detach(t.video)); tiles.clear();
   audioEls.forEach((el) => el.remove()); audioEls.clear();
   $('#meeting').hidden = true; $('#left').hidden = false;
@@ -258,6 +261,7 @@ function render() {
   const keys = new Set(wanted.map((w) => w.key));
   for (const [k, t] of tiles) if (!keys.has(k)) { t.track?.detach(t.video); t.el.remove(); tiles.delete(k); }
   if (pinned && !keys.has(pinned)) pinned = null;
+  if (fullKey && !keys.has(fullKey)) closeFull();
 
   for (const w of wanted) updateTile(w);
 
@@ -265,21 +269,61 @@ function render() {
   let stageKey = pinned;
   if (!stageKey && layoutMode === 'auto') stageKey = wanted.find((w) => w.kind === 'screen')?.key || null;
 
-  const stage = $('#stage'), grid = $('#grid');
+  const stage = $('#stage'), grid = $('#grid'), full = $('#fullStage');
   $('#stageWrap').classList.toggle('has-stage', !!stageKey);
   stage.hidden = !stageKey;
   const order = [...wanted].sort((a, b) => (b.kind === 'screen') - (a.kind === 'screen'));
   for (const w of order) {
     const el = tiles.get(w.key).el;
-    const parent = w.key === stageKey ? stage : grid;
+    const parent = w.key === fullKey ? full : w.key === stageKey ? stage : grid;
     if (el.parentElement !== parent) { parent.appendChild(el); tiles.get(w.key).video.play?.().catch(() => {}); }
   }
   // mantém a ordem na grade
-  order.filter((w) => w.key !== stageKey).forEach((w) => grid.appendChild(tiles.get(w.key).el));
+  order.filter((w) => w.key !== stageKey && w.key !== fullKey).forEach((w) => grid.appendChild(tiles.get(w.key).el));
 
   layoutGrid();
   renderPeople();
 }
+
+/* ------------------------------------------------- apresentação em tela cheia */
+// A sobreposição cobre a tela sempre; onde a Fullscreen API existir (Android,
+// desktop) ela também esconde as barras do navegador. No iPhone a API não
+// existe, e a sobreposição sozinha já dá o mesmo efeito de uso.
+function requestNativeFull(el) {
+  const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!fn) return;
+  try { fn.call(el, { navigationUI: 'hide' })?.catch?.(() => {}); } catch { /* sem suporte */ }
+}
+function exitNativeFull() {
+  const fn = document.exitFullscreen || document.webkitExitFullscreen;
+  if (!fn || !(document.fullscreenElement || document.webkitFullscreenElement)) return;
+  try { fn.call(document)?.catch?.(() => {}); } catch { /* ignora */ }
+}
+function openFull(key) {
+  if (!tiles.has(key)) return;
+  fullKey = key;
+  document.body.classList.add('fullsharing');
+  const box = $('#fullShare');
+  box.hidden = false;
+  requestNativeFull(box);
+  sync();
+}
+function closeFull() {
+  if (!fullKey && $('#fullShare').hidden) return;
+  fullKey = null;
+  document.body.classList.remove('fullsharing');
+  $('#fullShare').hidden = true;
+  exitNativeFull();
+  sync();
+}
+function toggleFull(key) { if (fullKey === key) closeFull(); else openFull(key); }
+
+['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => {
+  document.addEventListener(ev, () => {
+    if (fullKey && !(document.fullscreenElement || document.webkitFullscreenElement)) closeFull();
+  });
+});
+$('#exitFull').onclick = closeFull;
 
 function updateTile({ key, p, kind, track }) {
   let t = tiles.get(key);
@@ -287,9 +331,10 @@ function updateTile({ key, p, kind, track }) {
     const el = document.createElement('div');
     el.className = `tile ${kind}${p.isLocal ? ' local' : ''}`;
     el.innerHTML = `<video autoplay playsinline muted></video><div class="avatar"></div>
-      <div class="label"></div><button class="pin" title="Fixar em destaque">${ic('pin')}</button><div class="q"><i></i><i></i><i></i></div>`;
-    const togglePin = () => { pinned = pinned === key ? null : key; sync(); };
+      <div class="label"></div>${kind === 'screen' ? `<button class="fs" title="Ver em tela cheia">${ic('expand')}</button>` : ''}<button class="pin" title="Fixar em destaque">${ic('pin')}</button><div class="q"><i></i><i></i><i></i></div>`;
+    const togglePin = () => { if (fullKey === key) return closeFull(); pinned = pinned === key ? null : key; sync(); };
     el.querySelector('.pin').onclick = togglePin;
+    el.querySelector('.fs')?.addEventListener('click', (ev) => { ev.stopPropagation(); toggleFull(key); });
     el.ondblclick = togglePin;
     t = { el, video: el.querySelector('video'), track: null };
     tiles.set(key, t);
@@ -401,6 +446,7 @@ $('#copyLink').onclick = async () => {
 
 document.addEventListener('keydown', (e) => {
   if (!room || $('#meeting').hidden) return;
+  if (e.key === 'Escape' && fullKey) { closeFull(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); toggleMic(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') { e.preventDefault(); toggleCam(); }
 });

@@ -11,6 +11,9 @@ usando o [LiveKit](https://livekit.io) para transmitir a mídia por WebRTC.
   está desligada, destaca quem está falando e indica a qualidade da conexão.
 - **Compartilhamento de tela** (com o áudio da aba, quando o navegador permite): a tela vai para o
   destaque e as câmeras ficam numa faixa abaixo. O botão **Layout** alterna entre destaque e grade.
+- **Tela cheia da apresentação:** o botão de expandir no canto da tela compartilhada abre o vídeo
+  ocupando todo o visor, sem as barras do navegador onde o navegador permite. É o jeito mais
+  confortável de acompanhar uma apresentação no celular; `Esc` ou o ✕ volta para a reunião.
 - **Fixar participante:** clique no alfinete ou dê dois cliques em um vídeo.
 - **Chat** pelo canal de dados do LiveKit, com aviso de mensagem não lida.
 - **Participantes:** lista com o estado de câmera, microfone e tela de cada um.
