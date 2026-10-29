@@ -73,6 +73,26 @@ navegador para testar com duas pessoas.
   7882/UDP, ou o intervalo UDP configurado, no firewall. Veja docs.livekit.io/home/self-hosting.
 - Troque `devkey`/`secret` por chaves fortes.
 
+## Deploy no Render
+
+O `render.yaml` já descreve o serviço. No painel do Render, use **New → Blueprint** e escolha
+este repositório; ele cria o Web Service com:
+
+- Build: `pip install -r requirements.txt`
+- Start: `python serve.py` (Waitress, na porta que o Render injeta em `PORT`)
+- Health check: `/health`
+
+Depois preencha as variáveis marcadas como secretas (`LiveKit → Settings → Keys`):
+
+```
+LIVEKIT_URL=wss://SEU-PROJETO.livekit.cloud
+LIVEKIT_API_KEY=...
+LIVEKIT_API_SECRET=...
+```
+
+O `docker-compose.yml` **não** roda no Render: sem um servidor LiveKit acessível por `wss://`
+(o LiveKit Cloud tem plano gratuito), o site abre mas o vídeo não conecta.
+
 ## Testes
 
 ```bash
@@ -92,5 +112,6 @@ static/index.html   lobby, sala e diálogos
 static/app.js       lógica da reunião (livekit-client v2 via CDN)
 static/style.css    visual
 docker-compose.yml  servidor LiveKit local
+render.yaml         deploy no Render (build, start e variáveis)
 tests/              testes do backend e da interface
 ```
